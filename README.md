@@ -1,5 +1,7 @@
 # ode3
 
+#Atticus Yohn
+
 physx630 odelib
 ---
 
@@ -50,3 +52,34 @@ Two examples are given for using ODE solvers from the scipy.integrate sub-packag
     Solution (projScPY.py[ipynb]) using an older interface scipy.integrate.odeint¶ (see comments here: https://docs.scipy.org/doc/scipy/reference/integrate.html).  I do not recommend using this interface any longer.
 
 The notebook versions contain additional comments on using the integrators.
+
+# =================================================================================================
+# =================================================================================================
+# ===========================================  Answers ============================================
+# =================================================================================================
+# =================================================================================================
+
+
+RESULT OF QUESTION 1 PART B: (baseball1.cpp output)
+diameter d = 0.007500 m
+mass m = 0.145000 kg
+x(0) = 0 m
+y(0) = 0 m
+z(0) = 1.400000 m
+vx(0) = 45.155122 m/s
+vy(0) = 0.000000 m/s
+vz(0) = 0.788186 m/s
+theta_0 = 1.000000 degrees
+xend(tmax) = 18.517503 m
+yend(tmax) = 0.000000 m
+zend(tmax) = 0.897356 m
+********************************
+(xend,z0,theta0) = (18.500000,1.400000,1.000000)
+v_pitch = 45.162000 m/s
+********************************
+
+
+NOTES ON QUESTION 2: (baseball2.cpp and baseball3.cpp)
+In this problem, I edited the starter code (baseball2.cpp) and reached the solution without changing the overall framework of the code or ending lines. The code as there written returns one single trajectory graph relating to one single type of pitch (depending on the value of ip which must be changed by hand). Given the sloppy way in which I wrote the code, I was not sure how to compute all cases and display them in a single pdf by running the code a single time. Consequently, I refactored the code in baseball3.cpp, which is capable of running all four cases for the purpose of creating the desired graphs (though it destroys the end data and is more disimilar from the format of the starter code). In any event, both versions of the code are technically "fully functioning", I just created and used baseball3.cpp to more easily generate the pitches.pdf image. 
+
+

@@ -19,14 +19,7 @@ constexpr double PI = 3.14159265;
 constexpr double g = 9.81;
 constexpr double B = 4.1E-4;
 
-// data vectors to hold results
-std::vector<double> vX{};
-std::vector<double> vY{};
-std::vector<double> vZ{};
-std::vector<double> vdX{};
-std::vector<double> vdY{};
-std::vector<double> vdZ{};
-
+// Parameters
 struct Params {
   double g;   // acceleration [m/s^2]
   double d;   // m diameter of ball
@@ -34,6 +27,14 @@ struct Params {
   double w;   // magnitude of angular velocity
   double phi;   // angle of angular velocity vector (rad)
 };
+
+// data vectors to hold results
+std::vector<double> vX{};
+std::vector<double> vY{};
+std::vector<double> vZ{};
+std::vector<double> vdX{};
+std::vector<double> vdY{};
+std::vector<double> vdZ{};
 
 enum : unsigned char //index of variables in our dependant variable vector (S)
 {
@@ -47,12 +48,12 @@ enum : unsigned char //index of variables in our dependant variable vector (S)
   TOTAL_NUM_VARS
 };
 
-//drag force equation (in m/s)
-double F_drag(double v) { return 0.0039+0.0058/(1+std::exp((v-35)/5)); } 
-
 //===========================================================================================
 //====================== Differential Equations =============================================
 //===========================================================================================
+
+//drag force equation (in m/s)
+double F_drag(double v) { return 0.0039+0.0058/(1+std::exp((v-35)/5)); } 
 
 //rate of change in x direction
 double f_x(double t, const vector<double> &S, void *params=0){ 
@@ -160,105 +161,90 @@ void SetupFastball(vector<double>& y0, Params *p)
   p->phi = 5*PI/4;  // rad
 }
 
-int main(int argc, char **argv){
+struct Trajectory {
+    std::vector<double> x, y, z, dx, dy, dz;
+    TGraph *gY;
+    TGraph *gZ;
+};
 
-  bool showPlot=true;
-  // pitches
-  // slider ip=0
-  // curve ip=1
-  // screwball ip=2
-  // fast ip=3
-  int ip=0;    // default pitch
+Trajectory ComputeTrajectory(void (*SetupFn)(vector<double>&, Params*)) {
+    vector<double> y0;
+    Params *p = new Params();
+    SetupFn(y0, p);
 
-  vector<double> y0{};
-  Params *p_par = new Params();
-  
-  if (ip==0){
-    cout << "Setting up initial conditions for slider" << endl;
-    SetupSlider(y0, p_par);
-  }
-  else if (ip==1){
-    cout << "Setting up initial conditions for curveball" << endl;
-    SetupCurve(y0, p_par);
-  }
-  else if (ip==2){
-    cout << "Setting up initial conditions for screwball" << endl;
-    SetupScrewball(y0, p_par);
-  }
-  else {
-    cout << "Setting up initial conditions for fastball" << endl;
-    SetupFastball(y0, p_par);
-  }
+    // reset global trackers
+    vX.clear(); vY.clear(); vZ.clear();
+    vdX.clear(); vdY.clear(); vdZ.clear();
 
-  TApplication theApp("App", &argc, argv); // init ROOT App for displays
+    double t = 0;
+    double tmax = 60;
+    int nsteps = 2000;
+    vector<pfunc_t> v_fun{ f_x, f_y, f_z, f_dx, f_dy, f_dz };
 
-  xend = 60 / 3.28084; // m
+    xend = 60 / 3.3;
+    auto tg = RK4SolveN(v_fun, y0, nsteps, t, tmax, p, f_obs);
 
-  // write code here!
-  double t = 0;
-  double tmax = 60;
-  int nsteps = 2000;
-  vector<pfunc_t> v_fun{ f_x, f_y, f_z, f_dx, f_dy, f_dz };
-  auto tg = RK4SolveN(v_fun, y0, nsteps, t, tmax, p_par, f_obs);
+    int N = vX.size();
+    Trajectory out;
+    out.x.resize(N); out.y.resize(N); out.z.resize(N);
+    out.dx.resize(N); out.dy.resize(N); out.dz.resize(N);
 
-  //convert to feet and switch to C-style arrays
-  int N = vX.size();
-  double arrX[N], arrY[N], arrZ[N];
-  double arrdX[N], arrdY[N], arrdZ[N];
-  for(int i = 0; i < N; i++)
-  {
-    arrX[i] = 3.28084 * vX[i]; 
-    arrY[i] = 3.28084 * vY[i]; 
-    arrZ[i] = 3.28084 * vZ[i]; 
-    arrdX[i] = 3.28084 * vdX[i]; 
-    arrdY[i] = 3.28084 * vdY[i]; 
-    arrdZ[i] = 3.28084 * vdZ[i]; 
-  }
+    for (int i = 0; i < N; i++) {
+        out.x[i] = 3.28084 * vX[i];
+        out.y[i] = 3.28084 * vY[i];
+        out.z[i] = 3.28084 * vZ[i];
+        out.dx[i] = 3.28084 * vdX[i];
+        out.dy[i] = 3.28084 * vdY[i];
+        out.dz[i] = 3.28084 * vdZ[i];
+    }
 
-  TGraph *tgy = new TGraph(N, arrX, arrY);
-  tgy->SetTitle("y(t) and z(t) vs. x(t);x (m);y/z (m)");
-  tgy->SetMarkerStyle(21);
-  tgy->SetMarkerColor(kBlue);
-  TGraph *tgz = new TGraph(N, arrX, arrZ);
-  tgz->SetMarkerStyle(22);
-  tgz->SetMarkerColor(kRed);
+    out.gY = new TGraph(N, out.x.data(), out.y.data());
+    out.gZ = new TGraph(N, out.x.data(), out.z.data());
 
-  TCanvas *canvas = new TCanvas("canvas", "Y and Z vs. X", 800, 600);
-  tgy->SetMinimum(-4);
-  tgy->SetMaximum(2);
-  tgy->Draw("APL");
-  tgz->Draw("PL SAME");  
+    return out;
+}
 
-  auto legend = new TLegend(0.2,0.2,0.2,0.2);
-  legend->AddEntry(tgy, "y", "lp");
-  legend->AddEntry(tgz, "z", "lp");
-  legend->Draw();
-  canvas->Update();
-  canvas->Draw();
+int main(int argc, char **argv) {
 
-  xend = arrX[N - 1];   
-  double yend = arrY[N - 1];              
-  double zend = arrZ[N - 1];              
-  double vxend = arrdX[N - 1];  
-  double vyend = arrdY[N - 1];
-  double vzend = arrdZ[N - 1];
-  
+    TApplication theApp("theApp", &argc, argv);
 
-  // to compare to the plots in Fitzpatrick, output your results in **feet**
-  // do not change these lines
-  printf("********************************\n");
-  printf("Coordinates when x=60 feet\n");
-  printf("(x,y,z) = (%lf,%lf,%lf)\n",xend,yend,zend);
-  printf("(vx,vy,vz) = (%lf,%lf,%lf)\n",vxend,vyend,vzend);
-  printf("********************************\n");
+    // List of pitch types
+    std::vector<std::pair<std::string, void(*)(std::vector<double>&, Params*)>> pitchSetups = {
+        {"Slider",     SetupSlider},
+        {"Curveball",  SetupCurve},
+        {"Screwball",  SetupScrewball},
+        {"Fastball",   SetupFastball}
+    };
 
-  // plot the trajectory.  See Fitzpatrick for plot details
-  if (showPlot){
-    cout << "Press ^c to exit" << endl;
+    TCanvas *c = new TCanvas("c", "All pitches", 1200, 800);
+    c->Divide(2, 2);
+
+    int pad = 1;
+    for (auto &p : pitchSetups) {
+        auto traj = ComputeTrajectory(p.second);
+
+        c->cd(pad++);
+        traj.gY->SetTitle((p.first + " Trajectory; x (ft); y/z (ft)").c_str());
+        traj.gY->SetLineColor(kBlue);
+        traj.gZ->SetLineColor(kRed);
+
+        traj.gY->SetMinimum(-4);
+        traj.gY->SetMaximum(2);
+        traj.gY->Draw("AL");
+        traj.gZ->Draw("L SAME");
+
+        auto leg = new TLegend(0.6, 0.7, 0.9, 0.9);
+        leg->AddEntry(traj.gY, "y", "l");
+        leg->AddEntry(traj.gZ, "z", "l");
+        leg->Draw();
+    }
+
+    c->SaveAs("pitches.pdf");
+
+    std::cout << "Press ^c to exit" << endl;
     theApp.SetIdleTimer(30,".q");  // set up a failsafe timer to end the program  
     theApp.Run();
-  }
-  
-  return 0;
+    return 0;
 }
+
 
